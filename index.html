@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>H2O Lojistik & Sinerji Portalı v3.0</title>
+    <style>
+      /* Genel Reset ve Body */
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #0b0f19;
+        color: #fff;
+        overflow: hidden; /* Scroll'u kapatıyoruz */
+      }
+
+      /* Arka Plan Canvas Animasyonu */
+      #synergyCanvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+
+      /* Terminal / Boot Ekranı */
+      #bootScreen {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+        font-family: "Courier New", Courier, monospace;
+        color: #00ffcc;
+        font-size: 1.2rem;
+        text-shadow: 0 0 10px #00ffcc;
+        text-align: left;
+        width: 80%;
+        max-width: 600px;
+      }
+
+      /* Ana İçerik Paneli (Glassmorphism) */
+      .glass-panel {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        background: rgba(16, 25, 43, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 255, 204, 0.2);
+        border-radius: 20px;
+        width: 85%;
+        max-width: 800px;
+        padding: 50px;
+        box-shadow:
+          0 0 40px rgba(0, 255, 204, 0.1),
+          inset 0 0 20px rgba(0, 255, 204, 0.05);
+        display: none; /* JS ile açılacak */
+        opacity: 0;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(0, 255, 204, 0.3);
+        padding-bottom: 20px;
+        margin-bottom: 30px;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+        background: linear-gradient(90deg, #00ffcc, #0088ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(0, 255, 204, 0.1);
+        padding: 8px 16px;
+        border-radius: 20px;
+        border: 1px solid rgba(0, 255, 204, 0.4);
+        font-size: 0.9rem;
+        color: #00ffcc;
+      }
+
+      .pulse-dot {
+        width: 10px;
+        height: 10px;
+        background-color: #00ffcc;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #00ffcc;
+        animation: pulse 1.5s infinite alternate;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(1.5);
+          opacity: 1;
+        }
+      }
+
+      .content-box {
+        min-height: 150px;
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: #d1d5db;
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 8px;
+        height: 20px;
+        background-color: #00ffcc;
+        vertical-align: middle;
+        animation: blink 1s step-end infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      .btn-group {
+        margin-top: 40px;
+        display: flex;
+        gap: 20px;
+        opacity: 0; /* JS ile görünür olacak */
+        transition: opacity 1s ease;
+      }
+
+      .btn {
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 1rem;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn-primary {
+        background: linear-gradient(45deg, #00ffcc, #0088ff);
+        color: #000;
+        box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0 30px rgba(0, 255, 204, 0.6);
+      }
+
+      .btn-secondary {
+        background: transparent;
+        color: #00ffcc;
+        border: 1px solid #00ffcc;
+      }
+
+      .btn-secondary:hover {
+        background: rgba(0, 255, 204, 0.1);
+        transform: translateY(-3px);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="synergyCanvas"></canvas>
+
+    <div id="bootScreen"></div>
+
+    <div class="glass-panel" id="mainPanel">
+      <div class="header">
+        <h1>Su Tedarik Geri Bildirim</h1>
+        <div class="status-badge" style="display: none;">
+          <div class="pulse-dot"></div>
+          <span id="networkStatus">Ağ Sinerjisi Aktif</span>
+        </div>
+      </div>
+
+      <div class="content-box">
+        <span id="typedText"></span><span class="cursor"></span>
+      </div>
+
+      <div class="btn-group" id="btnGroup">
+        <button class="btn btn-primary" onclick="sendWhatsAppNotification()">
+          Tamamla
+        </button>
+      </div>
+    </div>
+
+    <script>
+      /* =========================================
+           1. ARKA PLAN CANVAS (PARTICLE NETWORK) 
+           (Departmanlar Arası Sinerji Ağı Simülasyonu)
+           ========================================= */
+      const canvas = document.getElementById("synergyCanvas");
+      const ctx = canvas.getContext("2d");
+      let particlesArray;
+
+      // Mouse pozisyonu
+      let mouse = { x: null, y: null, radius: 150 };
+
+      window.addEventListener("mousemove", function (event) {
+        mouse.x = event.x;
+        mouse.y = event.y;
+      });
+
+      // Ekran boyutlarını ayarla
+      function setCanvasSize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      setCanvasSize();
+      window.addEventListener("resize", setCanvasSize);
+
+      // Parçacık Sınıfı (Her bir departmanı/çalışanı temsil eder)
+      class Particle {
+        constructor(x, y, directionX, directionY, size, color) {
+          this.x = x;
+          this.y = y;
+          this.directionX = directionX;
+          this.directionY = directionY;
+          this.size = size;
+          this.color = color;
+        }
+        // Çizim
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+          ctx.fillStyle = this.color;
+          ctx.fill();
+        }
+        // Hareket ve Mouse Etkileşimi
+        update() {
+          if (this.x > canvas.width || this.x < 0)
+            this.directionX = -this.directionX;
+          if (this.y > canvas.height || this.y < 0)
+            this.directionY = -this.directionY;
+
+          // Mouse ile sinerji (itme) efekti
+          let dx = mouse.x - this.x;
+          let dy = mouse.y - this.y;
+          let distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < mouse.radius + this.size) {
+            if (mouse.x < this.x && this.x < canvas.width - this.size * 10)
+              this.x += 3;
+            if (mouse.x > this.x && this.x > this.size * 10) this.x -= 3;
+            if (mouse.y < this.y && this.y < canvas.height - this.size * 10)
+              this.y += 3;
+            if (mouse.y > this.y && this.y > this.size * 10) this.y -= 3;
+          }
+          this.x += this.directionX;
+          this.y += this.directionY;
+          this.draw();
+        }
+      }
+
+      function sendWhatsAppNotification() {
+        // Zeynep Hanım'ın telefon numarası (Ülke kodu ile, başında + veya 0 olmadan yazılmalı)
+        // Örnek: 905321234567
+        const phoneNumber = "905439378211"; // Buraya Zeynep Hanım'ın numarasını yazmalısın
+
+        // WP'den gidecek sanal "Sticker" ve sistem mesajı
+        const textMessage =
+          "selam";
+
+        // Mesajı URL formatına çevir
+        const encodedMessage = encodeURIComponent(textMessage);
+
+        // WhatsApp Web / App linkini oluştur ve yeni sekmede aç
+        const wpUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+        window.open(wpUrl, "_blank");
+      }
+      // Parçacıkları oluştur
+      function init() {
+        particlesArray = [];
+        let numberOfParticles = (canvas.height * canvas.width) / 9000;
+        for (let i = 0; i < numberOfParticles; i++) {
+          let size = Math.random() * 2 + 1;
+          let x = Math.random() * (innerWidth - size * 2 - size * 2) + size * 2;
+          let y =
+            Math.random() * (innerHeight - size * 2 - size * 2) + size * 2;
+          let directionX = Math.random() * 2 - 1;
+          let directionY = Math.random() * 2 - 1;
+          let color = "#00ffcc";
+          particlesArray.push(
+            new Particle(x, y, directionX, directionY, size, color),
+          );
+        }
+      }
+
+      // Çizgileri çiz (Sinerji Bağlantıları)
+      function connect() {
+        let opacityValue = 1;
+        for (let a = 0; a < particlesArray.length; a++) {
+          for (let b = a; b < particlesArray.length; b++) {
+            let distance =
+              (particlesArray[a].x - particlesArray[b].x) *
+                (particlesArray[a].x - particlesArray[b].x) +
+              (particlesArray[a].y - particlesArray[b].y) *
+                (particlesArray[a].y - particlesArray[b].y);
+
+            if (distance < (canvas.width / 7) * (canvas.height / 7)) {
+              opacityValue = 1 - distance / 20000;
+              ctx.strokeStyle = "rgba(0, 255, 204," + opacityValue + ")";
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+              ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      // Animasyon Döngüsü
+      function animate() {
+        requestAnimationFrame(animate);
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        for (let i = 0; i < particlesArray.length; i++) {
+          particlesArray[i].update();
+        }
+        connect();
+      }
+      init();
+      animate();
+
+      /* =========================================
+           2. SİSTEM BAŞLATMA VE DAKTİLO EFEKTİ (UI)
+           ========================================= */
+      const bootMessages = [];
+
+      const mainMessage =
+        "Değerli Zeynep Hanım,\n\nBildiriminiz ilgili birimlere iletilmiştir. Sarf malzeme tedarik zincirindeki bu 'çevik (agile)' tepki süreniz ve proaktif iletişiminiz için teşekkür ederim.\n\nSürecin yönetimindeki şeffaflığınız, departmanlar arası entegrasyonumuzun en güzel örneklerinden biridir.\n\nİyi çalışmalar dilerim.";
+
+      const bootDiv = document.getElementById("bootScreen");
+      const mainPanel = document.getElementById("mainPanel");
+      const typedTextSpan = document.getElementById("typedText");
+      const btnGroup = document.getElementById("btnGroup");
+
+      // Boot Ekranı Simülasyonu
+      async function runBootSequence() {
+        for (let i = 0; i < bootMessages.length; i++) {
+          bootDiv.innerHTML += bootMessages[i] + "<br>";
+          await new Promise((r) => setTimeout(r, 0)); // 600ms bekle
+        }
+        await new Promise((r) => setTimeout(r, 0));
+        bootDiv.style.display = "none";
+        showMainPanel();
+      }
+
+      // Ana Paneli Göster
+      function showMainPanel() {
+        mainPanel.style.display = "block";
+        // Fade-in efekti
+        setTimeout(() => {
+          mainPanel.style.opacity = "1";
+          mainPanel.style.transition = "opacity 1s ease";
+        }, 100);
+        setTimeout(typeWriter, 1000); // Daktiloyu başlat
+      }
+
+      // Daktilo Efekti
+      let i = 0;
+      function typeWriter() {
+        if (i < mainMessage.length) {
+          // Alt satıra geçişleri algıla (<br> ekle)
+          if (mainMessage.charAt(i) === "\n") {
+            typedTextSpan.innerHTML += "<br>";
+          } else {
+            typedTextSpan.innerHTML += mainMessage.charAt(i);
+          }
+          i++;
+          // Karakter yazım hızı rastgele (daha doğal hissettirir)
+          let speed = Math.random() * 30 + 20;
+          setTimeout(typeWriter, speed);
+        } else {
+          // Yazı bitince butonları göster
+          btnGroup.style.opacity = "1";
+        }
+      }
+
+      // Sistemi Başlat
+      window.onload = () => {
+        setTimeout(runBootSequence, 500);
+      };
+    </script>
+  </body>
+</html>
